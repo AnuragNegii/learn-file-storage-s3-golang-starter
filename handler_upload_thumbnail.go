@@ -1,10 +1,11 @@
 package main
 
 import (
-	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -45,12 +46,8 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusBadRequest, "couldn't get thumbnail file", err)
 		return
 	}
+	defer file.Close()	
 	mediaType := header.Header.Get("Content-Type")
-	data, err := io.ReadAll(file)
-	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "couldn't read the file", err)
-		return
-	}
 	video, err := cfg.db.GetVideo(videoID)
 	if err!=nil{
 		respondWithError(w, http.StatusBadRequest, "couldn't get thumbnail file", err)
@@ -60,10 +57,32 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusUnauthorized, "you are not authorized for this", nil)
 		return
 	}
-	dataString := base64.StdEncoding.EncodeToString(data)
-	url := fmt.Sprintf("DATA:%v;base64,%v", mediaType,dataString)
-	video.ThumbnailURL = &url
+	var fileType string
+	switch mediaType {
+	case "image/jpeg":
+		fileType = ".jpg"	
+	case "image/png":
+		fileType = ".png"
+	default:
+		respondWithError(w, http.StatusBadRequest, "wrong file type submitted", nil)
+		return
+	}
 	
+	videoFile := fmt.Sprintf("%s%s",video.ID.String(),fileType)
+	newPath := filepath.Join(cfg.assetsRoot,videoFile)
+	dst, err := os.Create(newPath)	
+	if err != nil{
+		respondWithError(w, http.StatusBadRequest, "couldn't create file", err)
+		return
+	}
+	defer dst.Close()
+	_, err = io.Copy(dst, file)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "couldn't read the file", err)
+		return
+	}
+	publicUrl := "/assets/" + videoFile
+	video.ThumbnailURL = &publicUrl
 	err = cfg.db.UpdateVideo(video)
 	if err != nil{
 		respondWithError(w, http.StatusInternalServerError, "couldn't update the video", err)
