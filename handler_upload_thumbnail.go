@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -45,7 +46,7 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	mediaType := header.Header.Get("Content-Type")
-	b, err := io.ReadAll(file)
+	data, err := io.ReadAll(file)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "couldn't read the file", err)
 		return
@@ -59,17 +60,14 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusUnauthorized, "you are not authorized for this", nil)
 		return
 	}
-	videoId := video.ID.String()
-	s := fmt.Sprintf("/api/thumbnails/%s", videoId)
-	video.ThumbnailURL = &s
-	videoThumbnails[video.ID] = thumbnail{
-		mediaType: mediaType,
-		data: b,	
-	}
+	dataString := base64.StdEncoding.EncodeToString(data)
+	url := fmt.Sprintf("DATA:%v;base64,%v", mediaType,dataString)
+	video.ThumbnailURL = &url
+	
 	err = cfg.db.UpdateVideo(video)
 	if err != nil{
 		respondWithError(w, http.StatusInternalServerError, "couldn't update the video", err)
 		return
 	}
-	respondWithJSON(w, http.StatusOK, videoThumbnails[videoID])
+	respondWithJSON(w, http.StatusOK, video)
 }
