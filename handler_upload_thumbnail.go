@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"mime"
@@ -72,9 +74,17 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusBadRequest, "wrong file type submitted", nil)
 		return
 	}
-	videoFile := fmt.Sprintf("%s%s",video.ID.String(),fileType)
-	newPath := filepath.Join(cfg.assetsRoot,videoFile)
-	dst, err := os.Create(newPath)	
+	key := make([]byte, 32)
+	_, err = rand.Read(key)
+	if err != nil{
+		respondWithError(w, http.StatusInternalServerError, "couldn't create key for the url", nil)
+		return
+	
+	}
+	urlString := base64.RawURLEncoding.EncodeToString(key)
+	videoFile := fmt.Sprintf("%s%s", urlString, fileType)
+	newPath := filepath.Join(cfg.assetsRoot, videoFile)
+	dst, err := os.Create(newPath)
 	if err != nil{
 		respondWithError(w, http.StatusBadRequest, "couldn't create file", err)
 		return

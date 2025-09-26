@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os/exec"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/database"
@@ -117,4 +120,45 @@ func (cfg *apiConfig) handlerVideosRetrieve(w http.ResponseWriter, r *http.Reque
 	}
 
 	respondWithJSON(w, http.StatusOK, videos)
+}
+
+func getVideoAspectRation(filepath string) (string, error){
+	cmd := exec.Command("ffprobe", "-v", "error", "-print_format", "json", "-show_streams", filepath)
+	var b bytes.Buffer
+	cmd.Stdout = &b
+	err := cmd.Run()
+	if err != nil{
+		return "", err
+	}
+	var videoData VideoData
+	err = json.Unmarshal(b.Bytes(), &videoData)
+	if err != nil{
+		return "", err
+	}
+	g := gcd(videoData.Streams[0].Width, videoData.Streams[0].Height)
+	aspectRatio := fmt.Sprintf("%d:%d", videoData.Streams[0].Width/g, videoData.Streams[0].Height/g)
+	fmt.Printf("aspect Ration : %v", aspectRatio)
+	switch aspectRatio {
+	case "16:9":
+		return "landscape", nil
+	case "9:16":
+		return "portrait", nil
+	default:
+		return "other", nil
+	}
+}
+
+func gcd(a, b int)int{
+	for b!= 0{
+		a, b = b, a%b
+	}
+	return a
+}
+
+type videoHeight struct{
+	Width int `json:"width"`
+	Height int `json:"height"`
+}
+type VideoData struct{
+	Streams []videoHeight `json:"streams"`
 }

@@ -1,11 +1,15 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
 
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/database"
+
 	// "github.com/google/uuid"
 
 	"github.com/joho/godotenv"
@@ -22,18 +26,11 @@ type apiConfig struct {
 	s3Region         string
 	s3CfDistribution string
 	port             string
+	s3Client		 *s3.Client
 }
-
-// type thumbnail struct {
-// 	data      []byte
-// 	mediaType string
-// }
-//
-// var videoThumbnails = map[uuid.UUID]thumbnail{}
 
 func main() {
 	godotenv.Load(".env")
-
 	pathToDB := os.Getenv("DB_PATH")
 	if pathToDB == "" {
 		log.Fatal("DB_URL must be set")
@@ -79,6 +76,12 @@ func main() {
 		log.Fatal("S3_CF_DISTRO environment variable is not set")
 	}
 
+	configuration, err := config.LoadDefaultConfig(context.Background(), config.WithRegion(s3Region))
+	if err != nil{
+		log.Fatal("couldn't load configuration")
+	}
+	s3Client := s3.NewFromConfig(configuration)
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		log.Fatal("PORT environment variable is not set")
@@ -93,6 +96,7 @@ func main() {
 		s3Bucket:         s3Bucket,
 		s3Region:         s3Region,
 		s3CfDistribution: s3CfDistribution,
+		s3Client: 		  s3Client,
 		port:             port,
 	}
 
